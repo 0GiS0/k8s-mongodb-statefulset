@@ -1,0 +1,47 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: mongo
+spec:
+  selector:
+    matchLabels:
+      app: db
+      name: mongodb
+  serviceName: mongodb-svc #the name of the headless service
+  replicas: 3
+  template:
+    metadata:
+      labels:
+        app: db
+        name: mongodb    
+    spec:
+      terminationGracePeriodSeconds: 10 #This is important for databases 
+      containers:
+      - name: mongo
+        image: mongo:3.6        
+        command: #https://docs.mongodb.com/manual/tutorial/deploy-replica-set/#start-each-member-of-the-replica-set-with-the-appropriate-options
+          - mongod
+        args: 
+          - --bind_ip=0.0.0.0
+          - --replSet=rs0 #The name of the replica set that the mongod is part of. All hosts in the replica set must have the same set name.
+          - --dbpath=/data/db          
+        livenessProbe:
+            exec:
+              command:
+                - mongo
+                - --eval
+                - "db.adminCommand('ping')"
+        ports:
+        - containerPort: 27017
+        volumeMounts:
+        - name: mongo-storage
+          mountPath: /data/db    
+  volumeClaimTemplates:
+    - metadata:
+        name: mongo-storage      
+      spec:
+        storageClassName: storage-mongo
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: 100Gi
